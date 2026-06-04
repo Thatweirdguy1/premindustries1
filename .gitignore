@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+venv/
+env/
+.env
+
+# Next.js / Node
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# Database & Uploads (Optional, but recommended for security)
+maintenance.db
+static/uploads/
