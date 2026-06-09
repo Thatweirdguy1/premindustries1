@@ -1,15 +1,20 @@
-# Python
+# Python & Backend
 __pycache__/
 venv/
 env/
 .env
 
-# Next.js / Node
+# Next.js / Node Frontend
 frontend/node_modules/
 frontend/.next/
 frontend/out/
 frontend/build/
 
-# Database & Uploads (Optional, but recommended for security)
+# Database & Uploads (Crucial for Factory Security)
 maintenance.db
 static/uploads/
+machine_reports/
+
+# OS Generated Files
+.DS_Store
+Thumbs.db
