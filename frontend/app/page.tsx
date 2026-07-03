@@ -32,7 +32,11 @@ export default function TechnicianDashboard() {
   const [technicianName, setTechnicianName] = useState("");
   const [operatorName, setOperatorName] = useState(""); 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  
+  // CHANGED: State arrays to hold multiple photos
+  const [signOffPhotoFiles, setSignOffPhotoFiles] = useState<File[]>([]);
+  const [pmPhotoFiles, setPmPhotoFiles] = useState<File[]>([]);
+  const [reportPhotoFiles, setReportPhotoFiles] = useState<File[]>([]);
 
   const [showPMModal, setShowPMModal] = useState(false);
   const [pmMachineId, setPmMachineId] = useState("");
@@ -41,7 +45,6 @@ export default function TechnicianDashboard() {
   const [pmSupervisorName, setPmSupervisorName] = useState("");
   const [pmTechnicianName, setPmTechnicianName] = useState("");
   const [pmOperatorName, setPmOperatorName] = useState("");
-  const [pmPhotoFile, setPmPhotoFile] = useState<File | null>(null);
 
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportMachineId, setReportMachineId] = useState(""); 
@@ -61,7 +64,6 @@ export default function TechnicianDashboard() {
   const [browserSupportsSpeech, setBrowserSupportsSpeech] = useState(false);
   const recognitionRef = useRef<any>(null);
 
-  // HARDCODED PRODUCTION IP
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://168.144.81.103:5000";
 
   useEffect(() => {
@@ -154,9 +156,10 @@ export default function TechnicianDashboard() {
       formData.append("technician_name", pmTechnicianName);
       formData.append("operator_name", pmOperatorName);
       
-      if (pmPhotoFile) {
-        formData.append("photo", pmPhotoFile);
-      }
+      // CHANGED: Loop through the array to append multiple photos
+      pmPhotoFiles.forEach((file) => {
+        formData.append("photos", file);
+      });
 
       const res = await fetch(`${baseUrl}/api/work-orders/preventive`, {
         method: "POST",
@@ -170,7 +173,7 @@ export default function TechnicianDashboard() {
       setPmSupervisorName("");
       setPmTechnicianName("");
       setPmOperatorName("");
-      setPmPhotoFile(null);
+      setPmPhotoFiles([]);
       fetchData();
       alert("✅ PM Logged Successfully");
     } catch (err) {
@@ -190,17 +193,22 @@ export default function TechnicianDashboard() {
         body: JSON.stringify({ supervisor_name: supervisorName, technician_name: technicianName, operator_name: operatorName })
       });
       if (!res.ok) throw new Error("Failed");
-      if (photoFile) {
+
+      // CHANGED: Upload multiple photos for sign-off
+      if (signOffPhotoFiles.length > 0) {
         const formData = new FormData();
-        formData.append("photo", photoFile);
+        signOffPhotoFiles.forEach((file) => {
+          formData.append("photos", file);
+        });
         await fetch(`${baseUrl}/api/work-orders/${selectedOrder.id}/photos`, { method: "POST", body: formData });
       }
+
       alert("✅ Work order signed off successfully!");
       setSelectedOrder(null); 
       setSupervisorName("");
       setTechnicianName("");
       setOperatorName("");
-      setPhotoFile(null);
+      setSignOffPhotoFiles([]);
       fetchData(); 
     } catch (err) {
       alert("Error submitting task.");
@@ -219,6 +227,11 @@ export default function TechnicianDashboard() {
       formData.append("task_category", reportCategory);
       formData.append("description", reportDescription);
 
+      // CHANGED: Send multiple photos for breakdown report
+      reportPhotoFiles.forEach((file) => {
+        formData.append("photos", file);
+      });
+
       const res = await fetch(`${baseUrl}/api/work-orders/report`, {
         method: "POST",
         body: formData
@@ -228,6 +241,7 @@ export default function TechnicianDashboard() {
       
       setShowReportModal(false);
       setReportDescription("");
+      setReportPhotoFiles([]);
       fetchData(); 
       alert("🚨 Breakdown reported!");
     } catch (err) {
@@ -427,12 +441,13 @@ export default function TechnicianDashboard() {
               <div>
                 <label className="block text-zinc-400 text-xs mb-2">Evidence / सबूत (Optional)</label>
                 <div className="relative border border-dashed border-zinc-700 rounded-xl p-4 text-center bg-zinc-950 hover:bg-zinc-800 transition-colors">
-                  <input type="file" accept="image/*" onChange={(e) => setPmPhotoFile(e.target.files ? e.target.files[0] : null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                  {pmPhotoFile ? <span className="text-zinc-200 text-xs">📸 {pmPhotoFile.name}</span> : <span className="text-zinc-500 text-xs uppercase tracking-wide">📷 Tap to Upload</span>}
+                  {/* CHANGED: Added 'multiple' to input */}
+                  <input type="file" multiple accept="image/*" onChange={(e) => setPmPhotoFiles(Array.from(e.target.files || []))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                  {pmPhotoFiles.length > 0 ? <span className="text-zinc-200 text-xs">📸 {pmPhotoFiles.length} photo(s) selected</span> : <span className="text-zinc-500 text-xs uppercase tracking-wide">📷 Tap to Upload Photos</span>}
                 </div>
               </div>
               <div className="flex gap-3 pt-2 pb-4 sm:pb-0">
-                <button type="button" onClick={() => { setShowPMModal(false); stopListening(); }} className="flex-1 bg-zinc-800 text-white rounded-xl p-3.5 text-sm font-medium hover:bg-zinc-700 transition-colors">Cancel</button>
+                <button type="button" onClick={() => { setShowPMModal(false); stopListening(); setPmPhotoFiles([]); }} className="flex-1 bg-zinc-800 text-white rounded-xl p-3.5 text-sm font-medium hover:bg-zinc-700 transition-colors">Cancel</button>
                 <button type="submit" disabled={isSubmitting} className="flex-1 bg-amber-500 text-zinc-950 rounded-xl p-3.5 text-sm font-medium hover:bg-amber-400 transition-colors disabled:opacity-50">Submit PM</button>
               </div>
             </form>
@@ -484,8 +499,18 @@ export default function TechnicianDashboard() {
                   )}
                 </div>
               </div>
+              
+              {/* CHANGED: Added file upload for fault reporting */}
+              <div>
+                <label className="block text-zinc-400 text-xs mb-2">Fault Photos / फ़ोटो (Optional)</label>
+                <div className="relative border border-dashed border-zinc-700 rounded-xl p-4 text-center bg-zinc-950 hover:bg-zinc-800 transition-colors">
+                  <input type="file" multiple accept="image/*" onChange={(e) => setReportPhotoFiles(Array.from(e.target.files || []))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                  {reportPhotoFiles.length > 0 ? <span className="text-zinc-200 text-xs">📸 {reportPhotoFiles.length} photo(s) selected</span> : <span className="text-zinc-500 text-xs uppercase tracking-wide">📷 Tap to attach Photos</span>}
+                </div>
+              </div>
+
               <div className="flex gap-3 pt-2 pb-4 sm:pb-0">
-                <button type="button" onClick={() => { setShowReportModal(false); stopListening(); }} className="flex-1 bg-zinc-800 text-white rounded-xl p-3.5 text-sm font-medium hover:bg-zinc-700 transition-colors">Cancel</button>
+                <button type="button" onClick={() => { setShowReportModal(false); stopListening(); setReportPhotoFiles([]); }} className="flex-1 bg-zinc-800 text-white rounded-xl p-3.5 text-sm font-medium hover:bg-zinc-700 transition-colors">Cancel</button>
                 <button type="submit" disabled={isSubmitting} className="flex-1 bg-red-600 text-white rounded-xl p-3.5 text-sm font-medium hover:bg-red-500 transition-colors disabled:opacity-50">Alert Team</button>
               </div>
             </form>
@@ -578,12 +603,13 @@ export default function TechnicianDashboard() {
               <div>
                 <label className="block text-zinc-400 text-xs mb-2">Evidence / सबूत (Optional)</label>
                 <div className="relative border border-dashed border-zinc-700 rounded-xl p-4 text-center bg-zinc-950 hover:bg-zinc-800 transition-colors">
-                  <input type="file" accept="image/*" onChange={(e) => setPhotoFile(e.target.files ? e.target.files[0] : null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                  {photoFile ? <span className="text-zinc-200 text-xs">📸 {photoFile.name}</span> : <span className="text-zinc-500 text-xs uppercase tracking-wide">📷 Tap to Upload</span>}
+                  {/* CHANGED: Added 'multiple' to input */}
+                  <input type="file" multiple accept="image/*" onChange={(e) => setSignOffPhotoFiles(Array.from(e.target.files || []))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                  {signOffPhotoFiles.length > 0 ? <span className="text-zinc-200 text-xs">📸 {signOffPhotoFiles.length} photo(s) selected</span> : <span className="text-zinc-500 text-xs uppercase tracking-wide">📷 Tap to Upload</span>}
                 </div>
               </div>
               <div className="flex gap-3 pt-2 pb-4 sm:pb-0">
-                <button type="button" onClick={() => { setSelectedOrder(null); setPhotoFile(null); }} className="flex-1 bg-zinc-800 text-white rounded-xl p-3.5 text-sm font-medium hover:bg-zinc-700 transition-colors">Cancel</button>
+                <button type="button" onClick={() => { setSelectedOrder(null); setSignOffPhotoFiles([]); }} className="flex-1 bg-zinc-800 text-white rounded-xl p-3.5 text-sm font-medium hover:bg-zinc-700 transition-colors">Cancel</button>
                 <button type="submit" disabled={isSubmitting} className="flex-1 bg-blue-600 text-white rounded-xl p-3.5 text-sm font-medium hover:bg-blue-500 transition-colors disabled:opacity-50">Complete Task</button>
               </div>
             </form>

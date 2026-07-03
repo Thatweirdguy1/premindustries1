@@ -33,15 +33,28 @@ interface SparePart {
   photo_url: string | null;
 }
 
+// NEW: Interface for Inspection Reports
+interface MachineReport {
+  id: number;
+  engineer_type: string;
+  engineer_name: string;
+  notes: string;
+  file_url: string | null;
+  created_at: string;
+}
+
 export default function MachineDirectory() {
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
-  const [activeTab, setActiveTab] = useState<"history" | "inventory">("history");
+  
+  // CHANGED: Added "reports" to the active tabs
+  const [activeTab, setActiveTab] = useState<"history" | "inventory" | "reports">("history");
   
   const [history, setHistory] = useState<HistoryLog[]>([]);
   const [parts, setParts] = useState<SparePart[]>([]);
+  const [reports, setReports] = useState<MachineReport[]>([]); // NEW: State for reports
   const [isPanelLoading, setIsPanelLoading] = useState(false);
 
   const [showAddPart, setShowAddPart] = useState(false);
@@ -51,7 +64,6 @@ export default function MachineDirectory() {
   const [newPartPhoto, setNewPartPhoto] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // HARDCODED PRODUCTION IP
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://168.144.81.103:5000";
 
   useEffect(() => {
@@ -75,10 +87,15 @@ export default function MachineDirectory() {
   const openMachineDetails = async (machine: Machine) => {
     setSelectedMachine(machine);
     setIsPanelLoading(true);
+    // Reset tab to history when opening a new machine
+    setActiveTab("history"); 
+    
     try {
-      const [historyRes, partsRes] = await Promise.all([
+      // CHANGED: Fetching Reports alongside History and Parts
+      const [historyRes, partsRes, reportsRes] = await Promise.all([
         fetch(`${baseUrl}/api/machines/${machine.id}/history`),
-        fetch(`${baseUrl}/api/machines/${machine.id}/parts`)
+        fetch(`${baseUrl}/api/machines/${machine.id}/parts`),
+        fetch(`${baseUrl}/api/machines/${machine.id}/reports`)
       ]);
       
       if (historyRes.ok) setHistory(await historyRes.json());
@@ -89,9 +106,17 @@ export default function MachineDirectory() {
       } else {
         setParts([]); 
       }
+
+      if (reportsRes.ok) {
+        setReports(await reportsRes.json());
+      } else {
+        setReports([]);
+      }
+
     } catch (error) {
       console.error("Failed to load details");
       setParts([]);
+      setReports([]);
     } finally {
       setIsPanelLoading(false);
     }
@@ -216,11 +241,15 @@ export default function MachineDirectory() {
               <h2 className="text-xl font-medium text-white">{selectedMachine.name} <span className="text-zinc-500 font-mono text-sm ml-2">{selectedMachine.asset_tag}</span></h2>
             </div>
 
-            <div className="flex border-b border-zinc-800">
-              <button onClick={() => setActiveTab("history")} className={`px-6 py-4 text-sm font-medium transition-colors border-b-2 ${activeTab === "history" ? "border-blue-500 text-blue-400" : "border-transparent text-zinc-400 hover:text-zinc-200"}`}>
+            {/* CHANGED: Added the Documents / Reports Tab */}
+            <div className="flex border-b border-zinc-800 overflow-x-auto">
+              <button onClick={() => setActiveTab("history")} className={`px-6 py-4 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === "history" ? "border-blue-500 text-blue-400" : "border-transparent text-zinc-400 hover:text-zinc-200"}`}>
                 📜 Service History
               </button>
-              <button onClick={() => setActiveTab("inventory")} className={`px-6 py-4 text-sm font-medium transition-colors border-b-2 ${activeTab === "inventory" ? "border-blue-500 text-blue-400" : "border-transparent text-zinc-400 hover:text-zinc-200"}`}>
+              <button onClick={() => setActiveTab("reports")} className={`px-6 py-4 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === "reports" ? "border-blue-500 text-blue-400" : "border-transparent text-zinc-400 hover:text-zinc-200"}`}>
+                📋 Inspection Reports
+              </button>
+              <button onClick={() => setActiveTab("inventory")} className={`px-6 py-4 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === "inventory" ? "border-blue-500 text-blue-400" : "border-transparent text-zinc-400 hover:text-zinc-200"}`}>
                 📦 Spare Parts
               </button>
             </div>
@@ -266,6 +295,44 @@ export default function MachineDirectory() {
                       </div>
                     )) : (
                       <div className="text-center py-12 border border-dashed border-zinc-800 rounded-3xl text-zinc-500 text-sm">No historical records found for this machine.</div>
+                    )}
+                  </div>
+                )}
+
+                {/* NEW: REPORTS TAB */}
+                {activeTab === "reports" && (
+                  <div className="space-y-4">
+                    {reports.length > 0 ? reports.map((report) => (
+                      <div key={report.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row gap-6">
+                        <div className="sm:w-1/4 shrink-0">
+                          <span className={`inline-block px-2.5 py-1 rounded-md text-[10px] font-medium tracking-wide uppercase mb-3 ${report.engineer_type === 'internal' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'}`}>
+                            {report.engineer_type} Engineer
+                          </span>
+                          <p className="text-zinc-500 text-xs mb-1">Date Uploaded</p>
+                          <p className="text-zinc-200 text-sm mb-4">{new Date(report.created_at).toLocaleDateString()}</p>
+                          <p className="text-zinc-500 text-xs mb-1">Uploaded By</p>
+                          <p className="text-zinc-200 text-sm font-medium">{report.engineer_name}</p>
+                        </div>
+                        <div className="flex-grow border-t sm:border-t-0 sm:border-l border-zinc-800 pt-4 sm:pt-0 sm:pl-6 flex flex-col">
+                          <p className="text-zinc-400 text-[10px] uppercase tracking-wider mb-2">Inspection Notes</p>
+                          <div className="bg-zinc-950 border border-zinc-800/50 rounded-xl p-4 text-sm text-zinc-300 leading-relaxed mb-4 flex-grow">
+                            {report.notes || "No additional notes provided."}
+                          </div>
+                          
+                          {report.file_url && (
+                            <a 
+                              href={report.file_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="inline-flex items-center justify-center gap-2 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 py-3 px-4 rounded-xl text-sm font-medium transition-colors w-full sm:w-max"
+                            >
+                              <span>📄</span> View Attached Document
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )) : (
+                      <div className="text-center py-12 border border-dashed border-zinc-800 rounded-3xl text-zinc-500 text-sm">No inspection reports uploaded for this machine.</div>
                     )}
                   </div>
                 )}
