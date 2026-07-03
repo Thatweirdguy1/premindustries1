@@ -33,7 +33,6 @@ interface SparePart {
   photo_url: string | null;
 }
 
-// NEW: Interface for Inspection Reports
 interface MachineReport {
   id: number;
   engineer_type: string;
@@ -47,14 +46,15 @@ export default function MachineDirectory() {
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(true);
   
+  // NEW: Search state
+  const [searchTerm, setSearchTerm] = useState("");
+
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
-  
-  // CHANGED: Added "reports" to the active tabs
   const [activeTab, setActiveTab] = useState<"history" | "inventory" | "reports">("history");
   
   const [history, setHistory] = useState<HistoryLog[]>([]);
   const [parts, setParts] = useState<SparePart[]>([]);
-  const [reports, setReports] = useState<MachineReport[]>([]); // NEW: State for reports
+  const [reports, setReports] = useState<MachineReport[]>([]); 
   const [isPanelLoading, setIsPanelLoading] = useState(false);
 
   const [showAddPart, setShowAddPart] = useState(false);
@@ -65,6 +65,8 @@ export default function MachineDirectory() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://168.144.81.103:5000";
+  // Determine the live frontend URL for the QR code to point to
+  const frontendUrl = typeof window !== "undefined" ? window.location.origin : "http://168.144.81.103:3000";
 
   useEffect(() => {
     fetchMachines();
@@ -76,6 +78,18 @@ export default function MachineDirectory() {
       if (res.ok) {
         const data = await res.json();
         setMachines(data);
+        
+        // NEW: Deep Linking Logic for QR Codes
+        if (typeof window !== "undefined") {
+          const urlParams = new URLSearchParams(window.location.search);
+          const idParam = urlParams.get('id');
+          if (idParam) {
+            const linkedMachine = data.find((m: Machine) => m.id.toString() === idParam);
+            if (linkedMachine) {
+              openMachineDetails(linkedMachine);
+            }
+          }
+        }
       }
     } catch (error) {
       console.error("Failed to fetch machines:", error);
@@ -87,11 +101,14 @@ export default function MachineDirectory() {
   const openMachineDetails = async (machine: Machine) => {
     setSelectedMachine(machine);
     setIsPanelLoading(true);
-    // Reset tab to history when opening a new machine
     setActiveTab("history"); 
     
+    // Update the URL in the browser without refreshing the page
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, '', `?id=${machine.id}`);
+    }
+    
     try {
-      // CHANGED: Fetching Reports alongside History and Parts
       const [historyRes, partsRes, reportsRes] = await Promise.all([
         fetch(`${baseUrl}/api/machines/${machine.id}/history`),
         fetch(`${baseUrl}/api/machines/${machine.id}/parts`),
@@ -119,6 +136,13 @@ export default function MachineDirectory() {
       setReports([]);
     } finally {
       setIsPanelLoading(false);
+    }
+  };
+
+  const handleCloseDetails = () => {
+    setSelectedMachine(null);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, '', window.location.pathname);
     }
   };
 
@@ -178,6 +202,12 @@ export default function MachineDirectory() {
     }
   };
 
+  // NEW: Filter logic for the search bar
+  const filteredMachines = machines.filter(m => 
+    m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    m.asset_tag.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (loading) return <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4"><p className="text-sm text-zinc-400 font-medium tracking-widest uppercase animate-pulse">Loading Registry...</p></div>;
 
   return (
@@ -192,56 +222,91 @@ export default function MachineDirectory() {
             <h1 className="text-2xl sm:text-3xl font-semibold text-white tracking-tight">Asset Registry</h1>
             <p className="text-zinc-500 text-sm mt-1">मशीन डायरेक्टरी</p>
           </div>
+
+          {/* NEW: Search Bar UI */}
+          {!selectedMachine && (
+            <div className="relative w-full md:w-80 shrink-0">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-50">🔍</span>
+              <input 
+                type="text" 
+                placeholder="Search name or asset tag..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-700 text-zinc-200 rounded-2xl py-4 pl-12 pr-4 outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-zinc-600"
+              />
+            </div>
+          )}
         </header>
 
         {!selectedMachine ? (
           <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-            {machines.map((machine) => (
-              <div 
-                key={machine.id} 
-                onClick={() => openMachineDetails(machine)}
-                className="bg-zinc-900/40 border border-zinc-800/80 rounded-2xl p-5 flex flex-col hover:bg-zinc-900/80 hover:border-zinc-700 transition-all cursor-pointer group"
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <span className={`px-2.5 py-1 rounded-md text-[10px] font-medium tracking-wide uppercase border ${machine.status === 'breakdown' ? 'bg-red-500/10 text-red-400 border-red-500/20 animate-pulse' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}`}>
-                    {machine.status === 'breakdown' ? 'Offline' : 'Operational'}
-                  </span>
-                  <span className="text-zinc-500 text-xs font-mono">{machine.asset_tag}</span>
-                </div>
-                
-                <h2 className="text-lg font-medium text-zinc-100 mb-4">{machine.name}</h2>
-                
-                {machine.risk_score !== undefined && (
-                  <div className="bg-zinc-950/50 rounded-xl p-3 mb-4 border border-zinc-800/50 flex items-center justify-between">
-                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Failure Risk</span>
-                    <span className={`text-sm font-bold ${machine.risk_score > 75 ? 'text-red-400' : machine.risk_score > 40 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                      {machine.risk_score}% {machine.risk_score > 75 && '⚠️'}
+            {filteredMachines.length > 0 ? (
+              filteredMachines.map((machine) => (
+                <div 
+                  key={machine.id} 
+                  onClick={() => openMachineDetails(machine)}
+                  className="bg-zinc-900/40 border border-zinc-800/80 rounded-2xl p-5 flex flex-col hover:bg-zinc-900/80 hover:border-zinc-700 transition-all cursor-pointer group"
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <span className={`px-2.5 py-1 rounded-md text-[10px] font-medium tracking-wide uppercase border ${machine.status === 'breakdown' ? 'bg-red-500/10 text-red-400 border-red-500/20 animate-pulse' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}`}>
+                      {machine.status === 'breakdown' ? 'Offline' : 'Operational'}
                     </span>
+                    <span className="text-zinc-500 text-xs font-mono">{machine.asset_tag}</span>
                   </div>
-                )}
-                
-                <div className="mt-auto pt-4 border-t border-zinc-800/50 flex justify-between items-center">
-                  <div>
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Next PM</p>
-                    <p className="text-zinc-300 text-xs">{machine.next_maintenance}</p>
-                  </div>
-                  <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center group-hover:bg-blue-500/20 group-hover:text-blue-400 transition-colors">
-                    →
+                  
+                  <h2 className="text-lg font-medium text-zinc-100 mb-4">{machine.name}</h2>
+                  
+                  {machine.risk_score !== undefined && (
+                    <div className="bg-zinc-950/50 rounded-xl p-3 mb-4 border border-zinc-800/50 flex items-center justify-between">
+                      <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Failure Risk</span>
+                      <span className={`text-sm font-bold ${machine.risk_score > 75 ? 'text-red-400' : machine.risk_score > 40 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                        {machine.risk_score}% {machine.risk_score > 75 && '⚠️'}
+                      </span>
+                    </div>
+                  )}
+                  
+                  <div className="mt-auto pt-4 border-t border-zinc-800/50 flex justify-between items-center">
+                    <div>
+                      <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Next PM</p>
+                      <p className="text-zinc-300 text-xs">{machine.next_maintenance}</p>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center group-hover:bg-blue-500/20 group-hover:text-blue-400 transition-colors">
+                      →
+                    </div>
                   </div>
                 </div>
+              ))
+            ) : (
+              <div className="col-span-full py-20 text-center text-zinc-500">
+                No machines found matching "{searchTerm}"
               </div>
-            ))}
+            )}
           </div>
         ) : (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div className="flex items-center gap-4">
-              <button onClick={() => setSelectedMachine(null)} className="bg-zinc-800 hover:bg-zinc-700 text-white font-medium px-4 py-2.5 rounded-xl transition-all text-sm flex items-center gap-2">
-                <span>←</span> Back to Grid
-              </button>
-              <h2 className="text-xl font-medium text-white">{selectedMachine.name} <span className="text-zinc-500 font-mono text-sm ml-2">{selectedMachine.asset_tag}</span></h2>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <button onClick={handleCloseDetails} className="bg-zinc-800 hover:bg-zinc-700 text-white font-medium px-4 py-2.5 rounded-xl transition-all text-sm flex items-center gap-2">
+                  <span>←</span> Back to Grid
+                </button>
+                <h2 className="text-xl font-medium text-white">{selectedMachine.name} <span className="text-zinc-500 font-mono text-sm ml-2">{selectedMachine.asset_tag}</span></h2>
+              </div>
+
+              {/* NEW: QR Code Display Card */}
+              <div className="bg-white p-2 rounded-xl flex items-center gap-4 border border-zinc-800/50 shrink-0">
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=70x70&data=${encodeURIComponent(`${frontendUrl}/machines?id=${selectedMachine.id}`)}`} 
+                  alt="QR Code" 
+                  className="rounded-lg w-[70px] h-[70px]"
+                />
+                <div className="pr-4 hidden sm:block">
+                  <p className="text-black font-bold text-sm leading-tight">Asset Tag</p>
+                  <p className="text-zinc-600 font-mono text-xs mt-1">{selectedMachine.asset_tag}</p>
+                  <p className="text-zinc-400 text-[10px] uppercase mt-2">Scan for details</p>
+                </div>
+              </div>
             </div>
 
-            {/* CHANGED: Added the Documents / Reports Tab */}
             <div className="flex border-b border-zinc-800 overflow-x-auto">
               <button onClick={() => setActiveTab("history")} className={`px-6 py-4 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === "history" ? "border-blue-500 text-blue-400" : "border-transparent text-zinc-400 hover:text-zinc-200"}`}>
                 📜 Service History
@@ -299,7 +364,7 @@ export default function MachineDirectory() {
                   </div>
                 )}
 
-                {/* NEW: REPORTS TAB */}
+                {/* REPORTS TAB */}
                 {activeTab === "reports" && (
                   <div className="space-y-4">
                     {reports.length > 0 ? reports.map((report) => (
