@@ -33,7 +33,6 @@ export default function TechnicianDashboard() {
   const [operatorName, setOperatorName] = useState(""); 
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // CHANGED: State arrays to hold multiple photos
   const [signOffPhotoFiles, setSignOffPhotoFiles] = useState<File[]>([]);
   const [pmPhotoFiles, setPmPhotoFiles] = useState<File[]>([]);
   const [reportPhotoFiles, setReportPhotoFiles] = useState<File[]>([]);
@@ -148,6 +147,14 @@ export default function TechnicianDashboard() {
     stopListening();
     setIsSubmitting(true);
     try {
+      // --- SAFETY CHECK ---
+      if (!pmMachineId || pmMachineId === "undefined" || pmMachineId === "") {
+        alert("⚠️ Please select a valid machine from the dropdown first!");
+        setIsSubmitting(false);
+        return;
+      }
+      // --------------------
+
       const formData = new FormData();
       formData.append("machine_id", pmMachineId);
       formData.append("task_category", pmCategory);
@@ -156,7 +163,6 @@ export default function TechnicianDashboard() {
       formData.append("technician_name", pmTechnicianName);
       formData.append("operator_name", pmOperatorName);
       
-      // CHANGED: Loop through the array to append multiple photos
       pmPhotoFiles.forEach((file) => {
         formData.append("photos", file);
       });
@@ -194,7 +200,6 @@ export default function TechnicianDashboard() {
       });
       if (!res.ok) throw new Error("Failed");
 
-      // CHANGED: Upload multiple photos for sign-off
       if (signOffPhotoFiles.length > 0) {
         const formData = new FormData();
         signOffPhotoFiles.forEach((file) => {
@@ -222,12 +227,19 @@ export default function TechnicianDashboard() {
     stopListening();
     setIsSubmitting(true);
     try {
+      // --- SAFETY CHECK ---
+      if (!reportMachineId || reportMachineId === "undefined" || reportMachineId === "") {
+        alert("⚠️ Please select a valid machine from the dropdown first!");
+        setIsSubmitting(false);
+        return;
+      }
+      // --------------------
+
       const formData = new FormData();
       formData.append("machine_id", reportMachineId);
       formData.append("task_category", reportCategory);
       formData.append("description", reportDescription);
 
-      // CHANGED: Send multiple photos for breakdown report
       reportPhotoFiles.forEach((file) => {
         formData.append("photos", file);
       });
@@ -256,6 +268,14 @@ export default function TechnicianDashboard() {
     stopListening();
     setIsSubmitting(true);
     try {
+      // --- SAFETY CHECK ---
+      if (!inspectionMachineId || inspectionMachineId === "undefined" || inspectionMachineId === "") {
+        alert("⚠️ Please select a valid machine from the dropdown first!");
+        setIsSubmitting(false);
+        return;
+      }
+      // --------------------
+
       const formData = new FormData();
       formData.append("machine_id", inspectionMachineId);
       formData.append("engineer_type", inspectionEngineerType);
@@ -441,7 +461,6 @@ export default function TechnicianDashboard() {
               <div>
                 <label className="block text-zinc-400 text-xs mb-2">Evidence / सबूत (Optional)</label>
                 <div className="relative border border-dashed border-zinc-700 rounded-xl p-4 text-center bg-zinc-950 hover:bg-zinc-800 transition-colors">
-                  {/* CHANGED: Added 'multiple' to input */}
                   <input type="file" multiple accept="image/*" onChange={(e) => setPmPhotoFiles(Array.from(e.target.files || []))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                   {pmPhotoFiles.length > 0 ? <span className="text-zinc-200 text-xs">📸 {pmPhotoFiles.length} photo(s) selected</span> : <span className="text-zinc-500 text-xs uppercase tracking-wide">📷 Tap to Upload Photos</span>}
                 </div>
@@ -500,7 +519,6 @@ export default function TechnicianDashboard() {
                 </div>
               </div>
               
-              {/* CHANGED: Added file upload for fault reporting */}
               <div>
                 <label className="block text-zinc-400 text-xs mb-2">Fault Photos / फ़ोटो (Optional)</label>
                 <div className="relative border border-dashed border-zinc-700 rounded-xl p-4 text-center bg-zinc-950 hover:bg-zinc-800 transition-colors">
@@ -603,7 +621,6 @@ export default function TechnicianDashboard() {
               <div>
                 <label className="block text-zinc-400 text-xs mb-2">Evidence / सबूत (Optional)</label>
                 <div className="relative border border-dashed border-zinc-700 rounded-xl p-4 text-center bg-zinc-950 hover:bg-zinc-800 transition-colors">
-                  {/* CHANGED: Added 'multiple' to input */}
                   <input type="file" multiple accept="image/*" onChange={(e) => setSignOffPhotoFiles(Array.from(e.target.files || []))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                   {signOffPhotoFiles.length > 0 ? <span className="text-zinc-200 text-xs">📸 {signOffPhotoFiles.length} photo(s) selected</span> : <span className="text-zinc-500 text-xs uppercase tracking-wide">📷 Tap to Upload</span>}
                 </div>

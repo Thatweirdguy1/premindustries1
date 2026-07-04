@@ -98,46 +98,33 @@ export default function MachineDirectory() {
     }
   };
 
-  const openMachineDetails = async (machine: Machine) => {
-    setSelectedMachine(machine);
-    setIsPanelLoading(true);
-    setActiveTab("history"); 
-    
-    // Update the URL in the browser without refreshing the page
-    if (typeof window !== "undefined") {
-      window.history.replaceState(null, '', `?id=${machine.id}`);
-    }
-    
-    try {
-      const [historyRes, partsRes, reportsRes] = await Promise.all([
-        fetch(`${baseUrl}/api/machines/${machine.id}/history`),
-        fetch(`${baseUrl}/api/machines/${machine.id}/parts`),
-        fetch(`${baseUrl}/api/machines/${machine.id}/reports`)
-      ]);
-      
-      if (historyRes.ok) setHistory(await historyRes.json());
-      
-      if (partsRes.ok) {
-        const partsData = await partsRes.json();
-        setParts(partsData);
-      } else {
-        setParts([]); 
-      }
-
-      if (reportsRes.ok) {
-        setReports(await reportsRes.json());
-      } else {
-        setReports([]);
-      }
-
-    } catch (error) {
-      console.error("Failed to load details");
-      setParts([]);
-      setReports([]);
-    } finally {
-      setIsPanelLoading(false);
-    }
-  };
+  // Replace your existing openMachineDetails with this:
+const openMachineDetails = async (machine: Machine) => {
+  setSelectedMachine(machine);
+  setIsPanelLoading(true);
+  setActiveTab("history"); 
+  
+  // This pushes the ID to the URL so the page remembers it
+  if (typeof window !== "undefined") {
+    window.history.replaceState(null, '', `?id=${machine.id}`);
+  }
+  
+  // Fetch data as before...
+  try {
+    const [historyRes, partsRes, reportsRes] = await Promise.all([
+      fetch(`${baseUrl}/api/machines/${machine.id}/history`),
+      fetch(`${baseUrl}/api/machines/${machine.id}/parts`),
+      fetch(`${baseUrl}/api/machines/${machine.id}/reports`)
+    ]);
+    if (historyRes.ok) setHistory(await historyRes.json());
+    if (partsRes.ok) setParts(await partsRes.json());
+    if (reportsRes.ok) setReports(await reportsRes.json());
+  } catch (error) {
+    console.error("Failed to load details");
+  } finally {
+    setIsPanelLoading(false);
+  }
+};
 
   const handleCloseDetails = () => {
     setSelectedMachine(null);
